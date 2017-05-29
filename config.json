@@ -3,5 +3,5 @@
   "RESULT_BUCKET": "tuneminder-text",
   "TRANSLATE_TOPIC": "tuneminder-translate-topic",
   "TRANSLATE": true,
-  "TO_LANG": ["en", "fr", "es", "ja", "ru"]
+  "TO_LANG": ["en"]
 }
