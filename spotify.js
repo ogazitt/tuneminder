@@ -57,7 +57,7 @@ exports.getSongInfo = function getSongInfo(songInfo) {
     return rp(options);
   })
   .then(function (json) {
-    url = json.tracks.items[0].href;
+    url = `https://open.spotify.com/track/${json.tracks.items[0].id}`;
       console.log('Track URL', url);
       return url;
   })
