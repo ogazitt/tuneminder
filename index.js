@@ -231,7 +231,7 @@ exports.sendSmsMessage = function sendSmsMessage (event) {
       var phoneNumber = null;
       var regex = /^1[1-9][0-9][0-9]/;
       if (regex.test(payload.filename)) {
-        phoneNumber = `+${payload.filename.substring(0, 10)}`;
+        phoneNumber = `+${payload.filename.substring(0, 11)}`;
       } else {
         phoneNumber = '+14257650079';  // hardcode my phone number
       }
