@@ -225,7 +225,7 @@ exports.sendSmsMessage = function sendSmsMessage (event) {
     })
     .then(() => {
       const messageData = {
-        href: href,
+        href: payload.href,
         filename: payload.filename
       };
       return publishResult(config.RESULT_TOPIC, messageData);
