@@ -15,18 +15,68 @@
 
 'use strict';
 
-// [START functions_ocr_setup]
 const config = require('./config.json');
 
+// Get a reference to the Pub/Sub component
+const pubsub = require('@google-cloud/pubsub')();
 // Get a reference to the Cloud Storage component
 const storage = require('@google-cloud/storage')();
 // Get a reference to the Cloud Vision API component
 const vision = require('@google-cloud/vision')();
 
-const Buffer = require('safe-buffer').Buffer;
-// [END functions_ocr_setup]
+// Get a reference to the spotify helper functions
+const spotify = require('./spotify');
 
-// [START functions_ocr_detect]
+const Buffer = require('safe-buffer').Buffer;
+
+/**
+ * Publishes the result to the given pubsub topic and returns a Promise.
+ *
+ * @param {string} topicName Name of the topic on which to publish.
+ * @param {object} data The message data to publish.
+ */
+function publishResult (topicName, data) {
+  return pubsub.topic(topicName).get({ autoCreate: true })
+    .then(([topic]) => topic.publish(data));
+}
+
+/**
+ * Detects the text in an image using the Google Vision API.
+ *
+ * @param {string} text Detected text.
+ * @returns {object} Song information as a map { band: string, song: string }.
+ */
+function extractSongInfo (text) {
+  // convert to a word array if necessary
+  let textArray = text.split("\n");
+
+  let result = [];
+  for (var i = 0; i < textArray.length; i++) {
+    let word = textArray[i];
+
+    const regexList = [/^[0-9]/, /^FM/, /^Presets/];
+    const isMatch = regexList.some(rx => rx.test(word));
+
+    // eliminate garbage
+    if (!isMatch) {
+      result.push(word);
+    }
+  }
+  
+  if (result.length === 0) {
+    return {};
+  }
+
+  let band = result[0].replace(/\([A-Za-z]*\)/,'').trim();
+  let song = result[1].trim();
+  console.log(`Extracted: Band: ${band}; Song: ${song}`);
+  var songInfo = {
+    band: band,
+    song: song
+  };
+  return songInfo;
+}
+
 /**
  * Detects the text in an image using the Google Vision API.
  *
@@ -45,12 +95,18 @@ function detectText (file) {
         text = _text;
       }
       console.log(`Extracted text from image: ${text}; (${text.length} chars)`);
-      return(saveResult(file.name, text));
+
+      // extract the song information from the text, into the map { band: name, song: name }
+      var songInfo = extractSongInfo(text);
+      // save the file name, which encodes the phone number to text back to
+      songInfo.filename = file.name;
+
+      return publishResult(config.GETSONGINFO_TOPIC, songInfo);
+
+      // return(saveResult(file.name, text));
     });
 }
-// [END functions_ocr_detect]
 
-// [START functions_ocr_rename]
 /**
  * Appends a .txt suffix to the image name.
  *
@@ -60,36 +116,7 @@ function detectText (file) {
 function renameImageForSave (filename) {
   return `${filename}.txt`;
 }
-// [END functions_ocr_rename]
 
-// [START functions_ocr_save]
-/**
- * Saves the data packet to a file in GCS. 
- *
- * @param {string} fname The original filename.
- * @param {string} text The extracted text.
- */
-function saveResult (fname, text) {
-  return Promise.resolve()
-    .then(() => {
-      console.log(`Received request to save file ${fname}`);
-
-      const bucketName = config.RESULT_BUCKET;
-      const filename = renameImageForSave(fname);
-      const file = storage.bucket(bucketName).file(filename);
-
-      console.log(`Saving result to ${filename} in bucket ${bucketName}`);
-
-      return file.save(text);
-    })
-    .then(() => {
-      console.log(`File saved.`);
-    });
-};
-// [END functions_ocr_save]
-
-
-// [START functions_ocr_process]
 /**
  * Cloud Function triggered by Cloud Storage when a file is uploaded.
  *
@@ -121,4 +148,127 @@ exports.processImage = function processImage (event) {
       console.log(`File ${file.name} processed.`);
     });
 };
-// [END functions_ocr_process]
+
+/**
+ * Get song URL from Spotify API. Triggered from a message on
+ * a Pub/Sub topic.
+ *
+ * @param {object} event The Cloud Functions event.
+ * @param {object} event.data The Cloud Pub/Sub Message object.
+ * @param {string} event.data.data The "data" property of the Cloud Pub/Sub
+ * Message. This property will be a base64-encoded string that you must decode.
+ */
+exports.getSongUrl = function getSongUrl (event) {
+  const pubsubMessage = event.data;
+  const jsonStr = Buffer.from(pubsubMessage.data, 'base64').toString();
+  const payload = JSON.parse(jsonStr);
+
+  return Promise.resolve()
+    .then(() => {
+      if (!payload.band) {
+        throw new Error('Band not provided. Make sure you have a "band" property in your request');
+      }
+      if (!payload.song) {
+        throw new Error('Song not provided. Make sure you have a "song" property in your request');
+      }
+      if (!payload.filename) {
+        throw new Error('Filename not provided. Make sure you have a "filename" property in your request');
+      }
+
+      const songInfo = {
+        band: payload.band,
+        song: payload.song
+      };
+
+      console.log(`Getting song info from Spotify - band: ${songInfo.band}, song: ${songInfo.song}`);
+      return spotify.getSongInfo(songInfo);
+    })
+    .then((href) => {
+      const messageData = {
+        href: href,
+        filename: payload.filename
+      };
+      console.log(`Spotify URL is ${href}`);
+      return publishResult(config.SENDSMS_TOPIC, messageData);
+    })
+    .then(() => {
+      console.log(`Spotify search complete`);
+    });
+};
+
+/**
+ * Send an SMS message. Triggered from a message on
+ * a Pub/Sub topic.
+ *
+ * @param {object} event The Cloud Functions event.
+ * @param {object} event.data The Cloud Pub/Sub Message object.
+ * @param {string} event.data.data The "data" property of the Cloud Pub/Sub
+ * Message. This property will be a base64-encoded string that you must decode.
+ */
+exports.sendSmsMessage = function sendSmsMessage (event) {
+  const pubsubMessage = event.data;
+  const jsonStr = Buffer.from(pubsubMessage.data, 'base64').toString();
+  const payload = JSON.parse(jsonStr);
+
+  return Promise.resolve()
+    .then(() => {
+      if (!payload.href) {
+        throw new Error('URL not provided. Make sure you have a "href" property in your request');
+      }
+      if (!payload.filename) {
+        throw new Error('Filename not provided. Make sure you have a "filename" property in your request');
+      }
+
+      console.log(`Sending SMS to ${payload.filename} containing URL: ${payload.href}`);
+      return;
+      //return spotify.getSongInfo(songInfo);
+    })
+    .then(() => {
+      const messageData = {
+        href: href,
+        filename: payload.filename
+      };
+      return publishResult(config.RESULT_TOPIC, messageData);
+    })
+    .then(() => {
+      console.log(`Sending SMS complete`);
+    });
+};
+
+/**
+ * Saves the data packet to a file in GCS. Triggered from a message on a Pub/Sub
+ * topic.
+ *
+ * @param {object} event The Cloud Functions event.
+ * @param {object} event.data The Cloud Pub/Sub Message object.
+ * @param {string} event.data.data The "data" property of the Cloud Pub/Sub
+ * Message. This property will be a base64-encoded string that you must decode.
+ */
+exports.saveResult = function saveResult (event) {
+  const pubsubMessage = event.data;
+  const jsonStr = Buffer.from(pubsubMessage.data, 'base64').toString();
+  const payload = JSON.parse(jsonStr);
+
+  return Promise.resolve()
+    .then(() => {
+      if (!payload.href) {
+        throw new Error('URL not provided. Make sure you have a "href" property in your request');
+      }
+      if (!payload.filename) {
+        throw new Error('Filename not provided. Make sure you have a "filename" property in your request');
+      }
+
+      console.log(`Received request to save file ${payload.filename}`);
+
+      const bucketName = config.RESULT_BUCKET;
+      const filename = renameImageForSave(payload.filename);
+      const file = storage.bucket(bucketName).file(filename);
+
+      console.log(`Saving result to ${filename} in bucket ${bucketName}`);
+
+      return file.save(payload.href);
+    })
+    .then(() => {
+      console.log(`File saved.`);
+    });
+};

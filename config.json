@@ -1,7 +1,6 @@
 {
   "RESULT_TOPIC": "tuneminder-result-topic",
   "RESULT_BUCKET": "tuneminder-text",
-  "TRANSLATE_TOPIC": "tuneminder-translate-topic",
-  "TRANSLATE": true,
-  "TO_LANG": ["en"]
+  "GETSONGINFO_TOPIC": "tuneminder-getsonginfo-topic",
+  "SENDSMS_TOPIC": "tuneminder-sendsms-topic"
 }
