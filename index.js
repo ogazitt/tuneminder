@@ -27,6 +27,10 @@ const vision = require('@google-cloud/vision')();
 // Get a reference to the spotify helper functions
 const spotify = require('./spotify');
 
+// Get a referenced to the twilio client library
+const twilio = require('twilio');
+const twilioConfig = require('./twilioConfig.json');
+
 const Buffer = require('safe-buffer').Buffer;
 
 /**
@@ -220,10 +224,29 @@ exports.sendSmsMessage = function sendSmsMessage (event) {
       }
 
       console.log(`Sending SMS to ${payload.filename} containing URL: ${payload.href}`);
-      return;
-      //return spotify.getSongInfo(songInfo);
+      
+      var client = new twilio(twilioConfig.TWILIO_ACCOUNT_SID, twilioConfig.TWILIO_AUTH_TOKEN);
+
+      // determine if the filename contains a phone number
+      var phoneNumber = null;
+      var regex = /^1[1-9][0-9][0-9]/;
+      if (regex.test(payload.filename)) {
+        phoneNumber = `+${payload.filename.substring(0, 10)}`;
+      } else {
+        phoneNumber = '+14257650079';  // hardcode my phone number
+      }
+
+      console.log(`Texting ${phoneNumber} the message ${payload.href}`);
+      return client.messages.create({
+          body: `${payload.href}`,
+          to: phoneNumber,     // Text this number
+          from: '+14252303042' // From a valid Twilio number
+      });
     })
-    .then(() => {
+    .then((message) => {
+      console.log(message.sid);
+
+      // publish the previous payload to save the final file
       const messageData = {
         href: payload.href,
         filename: payload.filename

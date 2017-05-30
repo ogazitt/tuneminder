@@ -1,12 +1,12 @@
 {
-  "name": "nodejs-docs-samples-functions-ocr",
+  "name": "tuneminder",
   "version": "0.0.1",
   "private": true,
   "license": "Apache-2.0",
-  "author": "Google Inc.",
+  "author": "Omri Gazitt",
   "repository": {
     "type": "git",
-    "url": "https://github.com/GoogleCloudPlatform/nodejs-docs-samples.git"
+    "url": "https://github.com/ogazitt/tuneminder.git"
   },
   "engines": {
     "node": ">=4.3.2"
@@ -19,12 +19,11 @@
   "dependencies": {
     "@google-cloud/pubsub": "0.10.0",
     "@google-cloud/storage": "1.1.0",
-    "@google-cloud/translate": "0.8.1",
     "@google-cloud/vision": "0.11.2",
     "request": "^2.81.0",
     "request-promise": "^4.2.1",
     "safe-buffer": "5.0.1",
-    "spotify-web-api-node": "^2.4.0"
+    "twilio": "^3.3.0"
   },
   "devDependencies": {
     "@google-cloud/nodejs-repo-tools": "1.4.14",
