@@ -1,3 +1,6 @@
 spotifyConfig.json
 twilioConfig.json
 test.jpg
+*.jpg
+*.JPG
+.DS_Store
