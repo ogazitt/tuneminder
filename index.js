@@ -41,7 +41,8 @@ const Buffer = require('safe-buffer').Buffer;
  */
 function publishResult (topicName, data) {
   return pubsub.topic(topicName).get({ autoCreate: true })
-    .then(([topic]) => topic.publish(data));
+    .then(([topic]) => topic.publish(data))
+    .then(() => { return(data); });
 }
 
 /**
@@ -108,6 +109,9 @@ function detectText (file) {
       return publishResult(config.GETSONGINFO_TOPIC, songInfo);
 
       // return(saveResult(file.name, text));
+    })
+    .then((data) => {
+      return saveData(config.SONGINFO_BUCKET, renameImageForSave(data.filename), data);
     });
 }
 
@@ -195,7 +199,7 @@ exports.getSongUrl = function getSongUrl (event) {
       console.log(`Spotify URL is ${href}`);
       return publishResult(config.SENDSMS_TOPIC, messageData);
     })
-    .then(() => {
+    .then((data) => {
       console.log(`Spotify search complete`);
     });
 };
@@ -290,6 +294,40 @@ exports.saveResult = function saveResult (event) {
       console.log(`Saving result to ${filename} in bucket ${bucketName}`);
 
       return file.save(payload.href);
+    })
+    .then(() => {
+      console.log(`File saved.`);
+    });
+};
+
+/**
+ * Saves data to a file in GCS. 
+ *
+ * @param {string} bucketName Name of bucket to save file into
+ * @param {string} filename Name of file to save
+ * @param {object} data Data structure to save (in JSON)
+ */
+function saveData (bucketName, filename, data) {
+  const pubsubMessage = event.data;
+  const jsonStr = Buffer.from(pubsubMessage.data, 'base64').toString();
+  const payload = JSON.parse(jsonStr);
+
+  return Promise.resolve()
+    .then(() => {
+      if (!payload.href) {
+        throw new Error('URL not provided. Make sure you have a "href" property in your request');
+      }
+      if (!payload.filename) {
+        throw new Error('Filename not provided. Make sure you have a "filename" property in your request');
+      }
+
+      console.log(`Received request to save file ${filename} in bucket ${bucketName}`);
+
+      const file = storage.bucket(bucketName).file(filename);
+
+      console.log(`Saving result to ${filename} in bucket ${bucketName}`);
+
+      return file.save(JSON.stringify(data));
     })
     .then(() => {
       console.log(`File saved.`);

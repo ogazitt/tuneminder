@@ -1,6 +1,7 @@
 {
   "RESULT_TOPIC": "tuneminder-result-topic",
   "RESULT_BUCKET": "tuneminder-text",
+  "SONGINFO_BUCKET": "tuneminder-songinfo",
   "GETSONGINFO_TOPIC": "tuneminder-getsonginfo-topic",
   "SENDSMS_TOPIC": "tuneminder-sendsms-topic"
 }
