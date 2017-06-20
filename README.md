@@ -50,9 +50,10 @@ spotifyConfig.json:
 Install the Google Cloud Platform SDK.
 
 ```
-gsutil mb gs://trueminder-staging  # create the staging bucket
-gsutil mb gs://trueminder-images   # create the bucket for uploading images
-gsutil mb gs://trueminder-text     # create the bucket for the final text files
+gsutil mb gs://tuneminder-staging  # create the staging bucket
+gsutil mb gs://tuneminder-images   # create the bucket for uploading images
+gsutil mb gs://tuneminder-songinfo # create the bucket for storing song information in JSON
+gsutil mb gs://tuneminder-text     # create the bucket for the final text files
 ./deploy_functions.sh              # deploy the Google Functions 
 ```
 
