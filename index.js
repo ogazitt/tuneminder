@@ -308,19 +308,8 @@ exports.saveResult = function saveResult (event) {
  * @param {object} data Data structure to save (in JSON)
  */
 function saveData (bucketName, filename, data) {
-  const pubsubMessage = event.data;
-  const jsonStr = Buffer.from(pubsubMessage.data, 'base64').toString();
-  const payload = JSON.parse(jsonStr);
-
   return Promise.resolve()
     .then(() => {
-      if (!payload.href) {
-        throw new Error('URL not provided. Make sure you have a "href" property in your request');
-      }
-      if (!payload.filename) {
-        throw new Error('Filename not provided. Make sure you have a "filename" property in your request');
-      }
-
       console.log(`Received request to save file ${filename} in bucket ${bucketName}`);
 
       const file = storage.bucket(bucketName).file(filename);
